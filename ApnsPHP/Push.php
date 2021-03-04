@@ -138,6 +138,9 @@ class ApnsPHP_Push extends ApnsPHP_Abstract
 
 			$bError = false;
 			foreach($this->_aMessageQueue as $k => &$aMessage) {
+
+                $startTime = microtime(true);
+
 				if (function_exists('pcntl_signal_dispatch')) {
 					pcntl_signal_dispatch();
 				}
@@ -172,7 +175,11 @@ class ApnsPHP_Push extends ApnsPHP_Abstract
 				$this->_log("STATUS: Sending message ID {$k} {$sCustomIdentifier} (" . ($nErrors + 1) . "/{$this->_nSendRetryTimes}): {$nLen} bytes.");
 
 				$aErrorMessage = null;
-				if ($nLen !== ($nWritten = (int)@fwrite($this->_hSocket, $aMessage['BINARY_NOTIFICATION']))) {
+
+                $nWritten = (int)@fwrite($this->_hSocket, $aMessage['BINARY_NOTIFICATION']);
+                $response = fread($this->_hSocket, 2048);
+
+				if ($nLen !== $nWritten) {
 					$aErrorMessage = array(
 						'identifier' => $k,
 						'statusCode' => self::STATUS_CODE_INTERNAL_ERROR,
@@ -184,6 +191,12 @@ class ApnsPHP_Push extends ApnsPHP_Abstract
 				usleep($this->_nWriteInterval);
 
 				$bError = $this->_updateQueue($aErrorMessage);
+
+                if ($this->_ctx) {
+
+                    $this->_writeLog->logIos($aMessage['BINARY_NOTIFICATION'], $response, microtime(true) - $startTime,  $aMessage['ERRORS']);
+                }
+
 				if ($bError) {
 					break;
 				}
